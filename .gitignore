@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Virtual environments
+venv/
+.env
+
+# Dataset
+Dataset/
+datasets/
+data/
+
+# Outputs
+outputs/
+
+# Models
+models/
+checkpoints/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# Large imaging files
+*.nii
+*.nii.gz
+*.h5

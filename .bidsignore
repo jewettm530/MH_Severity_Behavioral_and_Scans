@@ -1,0 +1,6 @@
+phenotype/*_definitions.tsv
+phenotype/demos.tsv
+phenotype/stroop01.tsv
+phenotype/postscan01.tsv
+/motion_FD
+/fMRI_timeseries_clean_denoised_GSR_parcellated
