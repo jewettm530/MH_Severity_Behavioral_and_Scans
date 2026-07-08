@@ -58,6 +58,21 @@ def main():
     imaging_only = merged[id_target_cols + imaging_cols]
     multimodal = merged[id_target_cols + behavioral_predictor_cols + imaging_cols]
 
+    demos = pd.read_csv("Dataset/phenotype/demos.csv", low_memory=False)
+    demos.columns = demos.columns.str.strip()
+
+    demos["subjectkey"] = demos["subjectkey"].astype(str).str.replace("_", "", regex=False)
+    merged["subjectkey"] = merged["subjectkey"].astype(str).str.replace("_", "", regex=False)
+
+    merged_with_demos = merged.merge(
+        demos[["subjectkey", "Site", "Group"]],
+        on="subjectkey",
+        how="left"
+    )
+
+    print("\nSite x Group counts for merged model sample:")
+    print(pd.crosstab(merged_with_demos["Site"], merged_with_demos["Group"], margins=True))
+
     behavioral_only.to_csv(OUTPUT_DIR / "final_behavioral_only.csv", index=False)
     imaging_only.to_csv(OUTPUT_DIR / "final_imaging_only.csv", index=False)
     multimodal.to_csv(OUTPUT_DIR / "final_multimodal.csv", index=False)
@@ -66,6 +81,7 @@ def main():
     print(" -", OUTPUT_DIR / "final_behavioral_only.csv", behavioral_only.shape)
     print(" -", OUTPUT_DIR / "final_imaging_only.csv", imaging_only.shape)
     print(" -", OUTPUT_DIR / "final_multimodal.csv", multimodal.shape)
+    print(pd.crosstab(merged["Site"], merged["Group"], margins=True))
 
 
 if __name__ == "__main__":
