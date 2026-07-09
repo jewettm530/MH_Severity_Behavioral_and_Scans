@@ -14,7 +14,7 @@ You likely need:
 - `fMRI_timeseries_clean_denoised_GSR_parcellated/`
 - optional: `motion_FD/`
 
-You likely do not need the raw `sub-*` folders if you are not using raw MRI images.
+You likely do not need the raw `sub-*` folders if you are not using raw MRI images (which we dont plan to)
 
 ## Setup
 
