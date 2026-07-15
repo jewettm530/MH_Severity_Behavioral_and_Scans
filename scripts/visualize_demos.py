@@ -9,35 +9,13 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Read data
 df = pd.read_csv(DATA_PATH, low_memory=False)
-# Load the participants that were actually used by the model
-merged = pd.read_csv("outputs/final_behavioral_only.csv")
-
-merged["subjectkey"] = (
-    merged["subjectkey"]
-    .astype(str)
-    .str.replace("_", "", regex=False)
-)
-
-df["subjectkey"] = (
-    df["subjectkey"]
-    .astype(str)
-    .str.replace("_", "", regex=False)
-)
-df = df[df["subjectkey"].isin(merged["subjectkey"])].copy()
-
-print(f"Participants after filtering to ML sample: {len(df)}")
-
 df.columns = df.columns.str.strip()
-
 
 # Dataset missing-value codes
 MISSING_CODES = ["999", "99", 999, 99, ""]
 
 # Replace known missing codes with NaN
 df = df.replace(MISSING_CODES, np.nan)
-
-print("\nSite x Group counts:")
-print(pd.crosstab(df["Site"], df["Group"], margins=True))
 
 # Convert numeric columns
 numeric_cols = [
@@ -80,6 +58,15 @@ def clean_category_series(series):
     ]
 
     return cleaned
+
+def save_primary_diagnosis_distribution():
+    save_bar_counts(
+        column="Primary_Dx",
+        title="Primary Diagnosis Distribution",
+        filename="primary_diagnosis_distribution.png",
+        top_n=15
+    )
+
 
 def save_group_sex_heatmap():
     """
@@ -151,7 +138,86 @@ def save_group_sex_heatmap():
     plt.close()
 
     print(f"Saved: {out_path}")   
-    
+    """
+    Creates one heatmap panel per Group.
+    Rows = sex
+    Columns = race
+    Cell values = participant counts
+    """
+    required = ["Group", "sex", "racial"]
+
+    for col in required:
+        if col not in df.columns:
+            print(f"Skipping group x sex x race heatmap: {col} not found")
+            return
+
+    temp = df[required].copy()
+
+    for col in required:
+        temp[col] = temp[col].replace(MISSING_CODES, np.nan)
+        temp[col] = temp[col].astype(str).str.strip()
+        temp = temp[
+            ~temp[col].isin(["999", "99", "nan", "NaN", "None", ""])
+        ]
+
+    if temp.empty:
+        print("Skipping group x sex x race heatmap: no usable data")
+        return
+
+    # Clean sex labels
+    temp["sex"] = temp["sex"].replace({
+        "F": "Female",
+        "M": "Male",
+        "O": "Other"
+    })
+
+    groups = sorted(temp["Group"].dropna().unique())
+
+    fig, axes = plt.subplots(
+        nrows=1,
+        ncols=len(groups),
+        figsize=(7 * len(groups), 6),
+        squeeze=False
+    )
+
+    for ax, group in zip(axes[0], groups):
+        group_df = temp[temp["Group"] == group]
+
+        table = pd.crosstab(group_df["sex"], group_df["racial"])
+
+        # Keep rows in a clean order
+        sex_order = ["Female", "Male", "Other"]
+        existing_order = [s for s in sex_order if s in table.index]
+        table = table.reindex(existing_order)
+
+        im = ax.imshow(table.values, aspect="auto")
+
+        ax.set_title(f"{group}: Sex × Race")
+        ax.set_xlabel("Race")
+        ax.set_ylabel("Sex")
+
+        ax.set_xticks(range(len(table.columns)))
+        ax.set_xticklabels(table.columns, rotation=45, ha="right")
+
+        ax.set_yticks(range(len(table.index)))
+        ax.set_yticklabels(table.index)
+
+        # Add count labels inside cells
+        for i in range(table.shape[0]):
+            for j in range(table.shape[1]):
+                value = table.iloc[i, j]
+                ax.text(j, i, str(value), ha="center", va="center")
+
+    fig.colorbar(im, ax=axes.ravel().tolist(), label="Number of participants")
+
+    plt.suptitle("Participant Counts by Group, Sex, and Race")
+    plt.tight_layout()
+
+    out_path = OUTPUT_DIR / "group_sex_race_heatmap.png"
+    plt.savefig(out_path, dpi=300)
+    plt.close()
+
+    print(f"Saved: {out_path}")
 
 def save_bar_counts(column, title, filename, top_n=None):
     if column not in df.columns:
@@ -401,12 +467,6 @@ save_bar_counts(
     top_n=15
 )
 
-df["meds_yes_no"] = df["meds_yes_no"].replace({
-    1: "No",
-    2: "Yes",
-    "1": "No",
-    "2": "Yes"
-})
 # 9. Medication use
 save_bar_counts(
     column="meds_yes_no",
@@ -414,12 +474,6 @@ save_bar_counts(
     filename="medication_use.png"
 )
 
-df["psych_meds"] = df["psych_meds"].replace({
-    1: "No",
-    2: "Yes",
-    "1": "No",
-    "2": "Yes"
-})
 # 10. Psychiatric medication use
 save_bar_counts(
     column="psych_meds",
@@ -427,7 +481,7 @@ save_bar_counts(
     filename="psychiatric_medication_use.png"
 )
 
-save_grouped_primary_diagnosis_distribution()
+save_primary_diagnosis_distribution()
 save_group_sex_heatmap()
 
 print("\nDone. Charts saved in:", OUTPUT_DIR)

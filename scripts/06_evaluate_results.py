@@ -1,70 +1,77 @@
-"""
-06_evaluate_results.py
-
-Purpose:
-- Summarize model performance.
-- Plot model comparison.
-- Extract Random Forest feature importance for presentation.
-
-Run:
-    python 06_evaluate_results.py
-"""
-
+"""Summarize modality performance and save feature importance outputs."""
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import OUTPUT_DIR, RESULTS_DIR, TARGET_COLUMN, SUBJECT_ID_COLUMN
 
-def clean_X(df):
-    X = df.drop(columns=[c for c in [TARGET_COLUMN, SUBJECT_ID_COLUMN, "participant_id"] if c in df.columns], errors="ignore")
-    X = X.dropna(axis=1, how="all")
-    object_cols = X.select_dtypes(include=["object"]).columns.tolist()
-    too_unique = [c for c in object_cols if X[c].nunique(dropna=True) > max(20, 0.5 * len(X))]
-    return X.drop(columns=too_unique, errors="ignore")
+from config import EXPERIMENT_DIR, RESULTS_DIR, MODELS_DIR, IMPORTANCE_DIR
+from model_utils import clean_X
 
-def feature_names(pipe, X):
+
+def transformed_feature_names(pipeline):
     names = []
-    for name, transformer, cols in pipe.named_steps["preprocess"].transformers_:
-        if name == "num": names.extend(cols)
-        elif name == "cat":
-            try: names.extend(transformer.named_steps["onehot"].get_feature_names_out(cols))
-            except Exception: names.extend(cols)
+    for name, transformer, columns in pipeline.named_steps['preprocess'].transformers_:
+        if name == 'num':
+            names.extend(columns)
+        elif name == 'cat':
+            names.extend(transformer.named_steps['onehot'].get_feature_names_out(columns))
     return list(names)
 
-def save_importance(name):
-    model_path = RESULTS_DIR / f"{name}_random_forest.joblib"
-    data_path = OUTPUT_DIR / f"final_{name}.csv"
-    pipe = joblib.load(model_path)
-    df = pd.read_csv(data_path, low_memory=False).dropna(subset=[TARGET_COLUMN])
-    X = clean_X(df)
-    names = feature_names(pipe, X)
-    imps = pipe.named_steps["model"].feature_importances_
-    n = min(len(names), len(imps))
-    out = pd.DataFrame({"feature": names[:n], "importance": imps[:n]}).sort_values("importance", ascending=False)
-    out.to_csv(RESULTS_DIR / f"{name}_feature_importance.csv", index=False)
-    top = out.head(15)
-    plt.figure(figsize=(10, 6))
-    plt.barh(top["feature"][::-1], top["importance"][::-1])
-    plt.xlabel("Random Forest feature importance")
-    plt.title(f"Top 15 Features: {name}")
-    plt.tight_layout()
-    plt.savefig(RESULTS_DIR / f"{name}_top15_feature_importance.png", dpi=200)
-    plt.close()
-    print("Saved feature importance for", name)
+
+def save_importance(experiment_name):
+    model_path = MODELS_DIR / f'{experiment_name}.joblib'
+    data_path = EXPERIMENT_DIR / f'{experiment_name}.csv'
+    if not model_path.exists() or not data_path.exists():
+        return
+    pipeline = joblib.load(model_path)
+    X = clean_X(pd.read_csv(data_path, low_memory=False))
+    names = transformed_feature_names(pipeline)
+    importance = pipeline.named_steps['model'].feature_importances_
+    n = min(len(names), len(importance))
+    output = pd.DataFrame({'feature': names[:n], 'importance': importance[:n]})
+    output = output.sort_values('importance', ascending=False)
+    IMPORTANCE_DIR.mkdir(parents=True, exist_ok=True)
+    output.to_csv(IMPORTANCE_DIR / f'{experiment_name}.csv', index=False)
+
 
 def main():
-    metrics = pd.read_csv(RESULTS_DIR / "model_comparison_metrics.csv")
-    print("\nModel comparison:")
-    print(metrics[["dataset", "n_total", "n_features", "cv_MAE_mean", "cv_RMSE_mean", "cv_R2_mean", "test_MAE", "test_RMSE", "test_R2"]])
-    plt.figure(figsize=(8,5))
-    plt.bar(metrics["dataset"], metrics["test_R2"])
-    plt.ylabel("Test R²")
-    plt.xlabel("Model input type")
-    plt.title("Random Forest Model Comparison")
-    plt.tight_layout()
-    plt.savefig(RESULTS_DIR / "model_comparison_test_R2.png", dpi=200)
-    plt.close()
-    for name in ["behavioral_only", "imaging_only", "multimodal"]: save_importance(name)
+    metrics = pd.read_csv(RESULTS_DIR / 'model_metrics_comparison.csv')
+    metrics = metrics[metrics['status'] == 'ok'].copy()
+    metrics = metrics.sort_values(['target_key', 'test_R2'], ascending=[True, False])
+    metrics.to_csv(RESULTS_DIR / 'model_metrics_comparison_sorted.csv', index=False)
 
-if __name__ == "__main__":
+    best = metrics.groupby('target_key', as_index=False).first()
+    best.to_csv(RESULTS_DIR / 'best_model_by_target.csv', index=False)
+
+    modality = metrics.groupby(['target_key', 'input_type', 'behavior_scope'], as_index=False).agg(
+        test_R2=('test_R2', 'mean'),
+        test_MAE=('test_MAE', 'mean'),
+        test_RMSE=('test_RMSE', 'mean'),
+        cv_R2_mean=('cv_R2_mean', 'mean'),
+        cv_R2_std=('cv_R2_std', 'mean'),
+    )
+    modality.to_csv(RESULTS_DIR / 'modality_scope_summary.csv', index=False)
+
+    print('\nBest model for each target:')
+    print(best[['target_key', 'experiment_name', 'test_R2', 'test_MAE', 'cv_R2_mean', 'cv_R2_std']].to_string(index=False))
+
+    for target, group in metrics.groupby('target_key'):
+        plot = group.copy()
+        plot['label'] = plot.apply(
+            lambda r: 'imaging only' if r['input_type'] == 'imaging_only'
+            else f"{r['input_type'].replace('_', ' ')}\n{r['behavior_scope']}", axis=1)
+        plt.figure(figsize=(11, 6))
+        plt.bar(plot['label'], plot['test_R2'])
+        plt.axhline(0, linewidth=1)
+        plt.ylabel('Test R²')
+        plt.title(f'{target.upper()} modality and scope comparison')
+        plt.xticks(rotation=40, ha='right')
+        plt.tight_layout()
+        plt.savefig(RESULTS_DIR / f'{target}_modality_scope_test_R2.png', dpi=200)
+        plt.close()
+
+    for experiment_name in best['experiment_name']:
+        save_importance(experiment_name)
+
+
+if __name__ == '__main__':
     main()
