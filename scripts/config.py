@@ -45,6 +45,14 @@ SUBJECT_ID_COLUMN = 'subjectkey'
 # globally replace 99 because 99 can be a valid score in some instruments.
 MISSING_CODES = [999, 9999, '999', '9999', '', 'NA', 'N/A']
 
+
+# Imaging feature engineering settings.
+# Regional parcel-strength variables are extracted for every parcel, then
+# reduced inside each training/CV fold to avoid feature-selection leakage.
+GRAPH_DENSITY = 0.10
+IMAGING_REGIONAL_SELECT_K = 30
+IMAGING_REGIONAL_PCA_COMPONENTS = 15
+
 REST_FILE_PATTERNS = [
     'task-restAP_run-01_bold_Atlas_hp2000_clean_GSR_parcellated.h5',
     'task-restAP_run-02_bold_Atlas_hp2000_clean_GSR_parcellated.h5',

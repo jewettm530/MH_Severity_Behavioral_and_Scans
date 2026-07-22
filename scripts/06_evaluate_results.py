@@ -8,13 +8,14 @@ from model_utils import clean_X
 
 
 def transformed_feature_names(pipeline):
-    names = []
-    for name, transformer, columns in pipeline.named_steps['preprocess'].transformers_:
-        if name == 'num':
-            names.extend(columns)
-        elif name == 'cat':
-            names.extend(transformer.named_steps['onehot'].get_feature_names_out(columns))
-    return list(names)
+    preprocess = pipeline.named_steps['preprocess']
+    try:
+        return list(preprocess.get_feature_names_out())
+    except Exception:
+        # Fallback names preserve alignment with feature_importances_ even if
+        # an older sklearn version cannot propagate names through FeatureUnion.
+        n = pipeline.named_steps['model'].n_features_in_
+        return [f"transformed_feature_{i:03d}" for i in range(n)]
 
 
 def save_importance(experiment_name):
