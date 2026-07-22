@@ -3,7 +3,7 @@ from io import StringIO
 import csv
 import pandas as pd
 
-phenotype_dir = Path("Dataset/phenotype")
+from config import PHENOTYPE_DIR
 
 
 def clean_quoted_line_file(path: Path) -> str:
@@ -128,7 +128,7 @@ def read_messy_tsv(path: Path) -> pd.DataFrame:
 
 
 def convert_all_tsvs():
-    tsv_files = sorted(phenotype_dir.glob("*.tsv"))
+    tsv_files = sorted(PHENOTYPE_DIR.glob("*.tsv"))
 
     print(f"Found {len(tsv_files)} TSV files.")
 

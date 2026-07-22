@@ -39,7 +39,12 @@ def main():
     metrics = metrics.sort_values(['target_key', 'test_R2'], ascending=[True, False])
     metrics.to_csv(RESULTS_DIR / 'model_metrics_comparison_sorted.csv', index=False)
 
-    best = metrics.groupby('target_key', as_index=False).first()
+    best = (
+    metrics.sort_values(['target_key', 'test_R2'], ascending=[True, False])
+    .groupby('target_key', as_index=False)
+    .head(1)
+    .reset_index(drop=True)
+    )
     best.to_csv(RESULTS_DIR / 'best_model_by_target.csv', index=False)
 
     modality = metrics.groupby(['target_key', 'input_type', 'behavior_scope'], as_index=False).agg(

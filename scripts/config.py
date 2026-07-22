@@ -1,13 +1,32 @@
 """Configuration for the TCP mental-health symptom-severity pipeline."""
-from pathlib import Path
 
-DATA_DIR = Path('/Users/maddiemac/AI4All/Final_Project/Dataset')
+from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+
+
+# Project root:
+# .../MH_Severity_Behavioral_and_Scans/
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+# Load the local .env file.
+load_dotenv(PROJECT_ROOT / '.env')
+
+
+# Dataset location comes from each teammate's local .env file.
+DATA_DIR = Path(os.environ['TCP_DATA_DIR'])
+
 PHENOTYPE_DIR = DATA_DIR / 'phenotype'
 FMRI_DIR = DATA_DIR / 'fMRI_timeseries_clean_denoised_GSR_parcellated'
 MOTION_DIR = DATA_DIR / 'motion_FD'
 DEMOS_FILE = PHENOTYPE_DIR / 'demos.csv'
 
-OUTPUT_DIR = Path('outputs')
+
+# Outputs are stored inside the project repository.
+OUTPUT_DIR = PROJECT_ROOT / 'outputs'
+
 CLEAN_BEHAVIOR_DIR = OUTPUT_DIR / 'behavioral_by_file'
 EXPERIMENT_DIR = OUTPUT_DIR / 'experiment_datasets'
 CROSS_CATEGORY_DIR = OUTPUT_DIR / 'cross_category_datasets'
@@ -15,7 +34,6 @@ RESULTS_DIR = OUTPUT_DIR / 'results'
 MODELS_DIR = RESULTS_DIR / 'models'
 PREDICTIONS_DIR = RESULTS_DIR / 'predictions'
 IMPORTANCE_DIR = RESULTS_DIR / 'feature_importance'
-
 RANDOM_STATE = 42
 TEST_SIZE = 0.20
 N_SPLITS = 5
